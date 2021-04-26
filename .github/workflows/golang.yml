@@ -1,0 +1,36 @@
+name: Release go
+
+on:
+  push:
+    branches: [ main ]
+
+
+jobs:
+  build:
+
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v2
+    - name: Increment Version
+      id: step_one
+      run: |
+        VINC=$(cat VERSION| awk -F"." '{ vinc=$3+1; print $1  "." $2 "." vinc }'); echo $VINC > VERSION
+    - name: Commit & Push changes
+      uses: actions-js/push@master
+      with:
+        github_token: ${{ secrets.GITHUB_TOKEN }}
+        branch: "main"
+        message: "[ci skip]"
+    - name: Bump Version
+      uses: remorses/bump-version@v8
+      with:
+        github_token: ${{ secrets.GITHUB_TOKEN }}
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+    # Add a test script to composer.json, for instance: "test": "vendor/bin/phpunit"
+    # Docs: https://getcomposer.org/doc/articles/scripts.md
+
+    # - name: Run test suite
+    #   run: composer run-script test
