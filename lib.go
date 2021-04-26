@@ -1,4 +1,4 @@
-package auth
+package krn
 
 import (
 	"crypto/aes"
