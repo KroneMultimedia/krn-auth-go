@@ -32,6 +32,51 @@ func NewKRNAuth(name string, crypt_key string, hmac_secret string, rest_key stri
 	return n
 }
 
+func (k *KRNAuth) sendRequest(method string, path string, headers []string, body string) []byte {
+	//create request
+	//sign request
+	//send request
+	//return bytes
+}
+func (k *KRNAuth) DeepValidate(inToken string) (interface{}, error) {
+	//FIXME MAKE GQL QUERY
+	q = `
+     mutation doRenew($passport: String!) {
+                renew(passport: $passport) {
+                    Message
+                    Renewed
+                    PassPort
+                    Expires
+                    Error
+                    DecodedToken {
+                        Email,
+                        ID,
+                        IntID,
+                        NickName
+                    }
+                }
+            } 
+	`
+	/*
+
+			$curl = curl_init(TRINITY_BASE_URL . '/graphql');
+		        curl_setopt($curl, CURLOPT_RETURNTRANSFER, true);
+		        curl_setopt($curl, CURLOPT_POST, true);
+
+		        curl_setopt($curl, CURLOPT_HTTPHEADER, array(
+		            'Content-Type: application/json',
+		        ));
+
+		        curl_setopt($curl, CURLOPT_POSTFIELDS, json_encode([
+		            'operationName' => 'doRenew',
+		            'query' => $RENEW_QUERY,
+		            'variables' => [
+		                'passport' => $token
+		            ]
+		        ]));
+	*/
+}
+
 func (k *KRNAuth) Validate(inToken string) (interface{}, error) {
 	tokenParts := strings.Split(inToken, ":")
 	if tokenParts[0] != k.Name {
@@ -46,6 +91,9 @@ func (k *KRNAuth) Validate(inToken string) (interface{}, error) {
 
 		return []byte(k.HMACSecret), nil
 	})
+	if err != nil {
+		return nil, err
+	}
 
 	if claims, ok := token.Claims.(jwtgo.MapClaims); ok && token.Valid {
 		var decoded map[string]interface{}
