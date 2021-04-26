@@ -28,4 +28,13 @@ func main() {
 	b, err := json.MarshalIndent(payload, "", "  ")
 	fmt.Printf("Token Valid!! Data \n %s\n", string(b))
 
+	payload, err = krnAuth.DeepValidate(pass)
+	if err != nil {
+		fmt.Println(err)
+		os.Exit(10)
+	}
+
+	b, err = json.MarshalIndent(payload, "", "  ")
+	fmt.Printf("Token Valid!! Data \n %s\n", string(b))
+
 }

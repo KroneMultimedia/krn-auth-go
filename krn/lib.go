@@ -7,6 +7,8 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"net/http"
+	"net/url"
 	"strings"
 
 	jwtgo "github.com/dgrijalva/jwt-go"
@@ -20,6 +22,8 @@ type KRNAuth struct {
 	RestKey    string
 	RSAKey     string
 }
+
+const TRINITY_URL = "https://lre-api.krone.at"
 
 func NewKRNAuth(name string, crypt_key string, hmac_secret string, rest_key string, rsa_key string) KRNAuth {
 	n := KRNAuth{
@@ -37,10 +41,18 @@ func (k *KRNAuth) sendRequest(method string, path string, headers []string, body
 	//sign request
 	//send request
 	//return bytes
+	return []byte("a")
 }
+
+type krnAuthRenewQuery struct {
+	OperationName string            `json:"operationName"`
+	Query         string            `json:"query"`
+	Variables     map[string]string `json:"variables"`
+}
+
 func (k *KRNAuth) DeepValidate(inToken string) (interface{}, error) {
 	//FIXME MAKE GQL QUERY
-	q = `
+	q := `
      mutation doRenew($passport: String!) {
                 renew(passport: $passport) {
                     Message
@@ -57,6 +69,32 @@ func (k *KRNAuth) DeepValidate(inToken string) (interface{}, error) {
                 }
             } 
 	`
+
+	hc := http.Client{}
+	form := url.Values{}
+	que := krnAuthRenewQuery{
+		OperationName: "doRenew",
+		Query:         q,
+		Variables:     map[string]string{"passport": inToken},
+	}
+	out, _ := json.Marshal(que)
+	queryAsString := string(out)
+	form.Add("operationName", "doRenew")
+	form.Add("query", q)
+	form.Add("variables", queryAsString)
+	req, err := http.NewRequest("POST", fmt.Sprintf("%s/graphql", TRINITY_URL), strings.NewReader(form.Encode()))
+	if err != nil {
+		return nil, err
+
+	}
+	resp, err := hc.Do(req)
+	if err != nil {
+		return nil, err
+
+	}
+
+	fmt.Println(resp)
+	return nil, nil
 	/*
 
 			$curl = curl_init(TRINITY_BASE_URL . '/graphql');
