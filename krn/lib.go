@@ -32,8 +32,8 @@ func NewKRNAuth(name string, crypt_key string, hmac_secret string, rest_key stri
 	return n
 }
 
-func (k *KRNAuth) Validate(token string) (interface{}, error) {
-	tokenParts := strings.Split(token, ":")
+func (k *KRNAuth) Validate(inToken string) (interface{}, error) {
+	tokenParts := strings.Split(inToken, ":")
 	if tokenParts[0] != k.Name {
 		return nil, errors.New("Invalid token")
 	}
