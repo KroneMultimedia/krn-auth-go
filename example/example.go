@@ -12,7 +12,7 @@ var (
 	cryptKey   = os.Getenv("KRN_CRYPT_KEY")
 	hmacSecret = os.Getenv("KRN_HMAC_SECRET")
 	restKey    = os.Getenv("KRN_REST_KEY")
-	rsaKey     = os.Getenv("KRN_RSA_KEY")
+	rsaKey     = "RSA KEY"
 )
 
 var pass = os.Args[1]
@@ -36,5 +36,12 @@ func main() {
 
 	b, err = json.MarshalIndent(payload, "", "  ")
 	fmt.Printf("Token Valid!! Data \n %s\n", string(b))
+
+	res, err := krnAuth.SendRequest("GET", "/KRN/signing_test", map[string]string{}, "")
+	if err != nil {
+		fmt.Println(err)
+		os.Exit(11)
+	}
+	fmt.Println(res)
 
 }

@@ -3,12 +3,19 @@ package krn
 import (
 	"crypto/aes"
 	"crypto/cipher"
+	"crypto/rsa"
+	"crypto/x509"
 	"encoding/base64"
 	"encoding/json"
+	"encoding/pem"
+	"time"
+
+	"github.com/go-fed/httpsig"
+
 	"errors"
 	"fmt"
+	"io/ioutil"
 	"net/http"
-	"net/url"
 	"strings"
 
 	jwtgo "github.com/dgrijalva/jwt-go"
@@ -23,7 +30,7 @@ type KRNAuth struct {
 	RSAKey     string
 }
 
-const TRINITY_URL = "https://lre-api.krone.at"
+const TRINITY_URL = "https://lre-trinity.krone.at"
 
 func NewKRNAuth(name string, crypt_key string, hmac_secret string, rest_key string, rsa_key string) KRNAuth {
 	n := KRNAuth{
@@ -36,12 +43,34 @@ func NewKRNAuth(name string, crypt_key string, hmac_secret string, rest_key stri
 	return n
 }
 
-func (k *KRNAuth) sendRequest(method string, path string, headers []string, body string) []byte {
+func (k *KRNAuth) SendRequest(method string, path string, headers map[string]string, body string) (string, error) {
 	//create request
+	url := fmt.Sprintf("%s%s", TRINITY_URL, path)
+	hc := http.Client{}
+	req, err := http.NewRequest(method, url, strings.NewReader(body))
+
+	if err != nil {
+		return "", err
+	}
+	for k, v := range headers {
+		req.Header.Set(k, v)
+	}
+	req.Header.Set("Date", time.Now().UTC().String())
+	req.Header.Set("krn-partner-key", k.RestKey)
+	req.Header.Set("krn-sign-url", url)
 	//sign request
+	err = k.signRequest(req)
+	if err != nil {
+		return "", err
+	}
 	//send request
+	resp, err := hc.Do(req)
+	if err != nil {
+		return "", err
+	}
 	//return bytes
-	return []byte("a")
+	bodyBytes, err := ioutil.ReadAll(resp.Body)
+	return string(bodyBytes), nil
 }
 
 type krnAuthRenewQuery struct {
@@ -51,7 +80,6 @@ type krnAuthRenewQuery struct {
 }
 
 func (k *KRNAuth) DeepValidate(inToken string) (interface{}, error) {
-	//FIXME MAKE GQL QUERY
 	q := `
      mutation doRenew($passport: String!) {
                 renew(passport: $passport) {
@@ -71,18 +99,17 @@ func (k *KRNAuth) DeepValidate(inToken string) (interface{}, error) {
 	`
 
 	hc := http.Client{}
-	form := url.Values{}
-	que := krnAuthRenewQuery{
+
+	graphQuery := krnAuthRenewQuery{
 		OperationName: "doRenew",
 		Query:         q,
 		Variables:     map[string]string{"passport": inToken},
 	}
-	out, _ := json.Marshal(que)
-	queryAsString := string(out)
-	form.Add("operationName", "doRenew")
-	form.Add("query", q)
-	form.Add("variables", queryAsString)
-	req, err := http.NewRequest("POST", fmt.Sprintf("%s/graphql", TRINITY_URL), strings.NewReader(form.Encode()))
+	graphQueryJson, _ := json.Marshal(graphQuery)
+	queryAsString := string(graphQueryJson)
+
+	url := fmt.Sprintf("%s/graphql", TRINITY_URL)
+	req, err := http.NewRequest("POST", url, strings.NewReader(queryAsString))
 	if err != nil {
 		return nil, err
 
@@ -92,9 +119,16 @@ func (k *KRNAuth) DeepValidate(inToken string) (interface{}, error) {
 		return nil, err
 
 	}
-
-	fmt.Println(resp)
-	return nil, nil
+	bodyBytes, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		return nil, err
+	}
+	var dat map[string]map[string]map[string]interface{}
+	if err := json.Unmarshal(bodyBytes, &dat); err != nil {
+		return nil, err
+	}
+	payload := dat["data"]["renew"]["DecodedToken"]
+	return payload, nil
 	/*
 
 			$curl = curl_init(TRINITY_BASE_URL . '/graphql');
@@ -177,4 +211,37 @@ func (k *KRNAuth) decryptString(encrypted string) (string, error) {
 
 	cipherText, _ = pkcs7.Unpad(cipherText, aes.BlockSize)
 	return fmt.Sprintf("%s", cipherText), nil
+}
+
+func (k *KRNAuth) loadPrivateKey() (*rsa.PrivateKey, error) {
+
+	pem, _ := pem.Decode([]byte(k.RSAKey))
+	if pem == nil {
+		return nil, errors.New("cannot decode pem")
+	}
+	if pem.Type != "RSA PRIVATE KEY" {
+		return nil, fmt.Errorf("RSA private key is of the wrong type: %s", pem.Type)
+	}
+
+	return x509.ParsePKCS1PrivateKey(pem.Bytes)
+}
+
+func (k *KRNAuth) signRequest(req *http.Request) error {
+
+	/// Modifies R and adds signing headers
+	headersToSign := []string{httpsig.RequestTarget, "krn-partner-key", "KRN-SIGN-URL", "Date"}
+	signer, _, err := httpsig.NewSigner([]httpsig.Algorithm{httpsig.RSA_SHA256}, httpsig.DigestSha256, headersToSign, httpsig.Signature, 0)
+	if err != nil {
+		return err
+	}
+	privKey, err := k.loadPrivateKey()
+	if err != nil {
+		return err
+	}
+	if err := signer.SignRequest(privKey, "KRN", req, nil); err != nil {
+		return err
+	}
+
+	return nil
+
 }
