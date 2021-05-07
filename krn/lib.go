@@ -30,7 +30,7 @@ type KRNAuth struct {
 	RSAKey     string
 }
 
-const TRINITY_URL = "https://lre-trinity.krone.at"
+const TRINITY_URL = "https://trinity.krone.at"
 
 func NewKRNAuth(name string, crypt_key string, hmac_secret string, rest_key string, rsa_key string) KRNAuth {
 	n := KRNAuth{
@@ -79,74 +79,26 @@ type krnAuthRenewQuery struct {
 	Variables     map[string]string `json:"variables"`
 }
 
-func (k *KRNAuth) DeepValidate(inToken string) (interface{}, error) {
-	q := `
-     mutation doRenew($passport: String!) {
-                renew(passport: $passport) {
-                    Message
-                    Renewed
-                    PassPort
-                    Expires
-                    Error
-                    DecodedToken {
-                        Email,
-                        ID,
-                        IntID,
-                        NickName
-                    }
-                }
-            } 
-	`
+func (k *KRNAuth) DeepValidate(inToken string) (string, error) {
 
 	hc := http.Client{}
 
-	graphQuery := krnAuthRenewQuery{
-		OperationName: "doRenew",
-		Query:         q,
-		Variables:     map[string]string{"passport": inToken},
-	}
-	graphQueryJson, _ := json.Marshal(graphQuery)
-	queryAsString := string(graphQueryJson)
-
-	url := fmt.Sprintf("%s/graphql", TRINITY_URL)
-	req, err := http.NewRequest("POST", url, strings.NewReader(queryAsString))
+	url := fmt.Sprintf("%s/deep-validate?token=%s", TRINITY_URL, inToken)
+	req, err := http.NewRequest("POST", url, nil)
 	if err != nil {
-		return nil, err
+		return "", err
 
 	}
 	resp, err := hc.Do(req)
 	if err != nil {
-		return nil, err
+		return "", err
 
 	}
 	bodyBytes, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
-		return nil, err
+		return "", err
 	}
-	var dat map[string]map[string]map[string]interface{}
-	if err := json.Unmarshal(bodyBytes, &dat); err != nil {
-		return nil, err
-	}
-	payload := dat["data"]["renew"]["DecodedToken"]
-	return payload, nil
-	/*
-
-			$curl = curl_init(TRINITY_BASE_URL . '/graphql');
-		        curl_setopt($curl, CURLOPT_RETURNTRANSFER, true);
-		        curl_setopt($curl, CURLOPT_POST, true);
-
-		        curl_setopt($curl, CURLOPT_HTTPHEADER, array(
-		            'Content-Type: application/json',
-		        ));
-
-		        curl_setopt($curl, CURLOPT_POSTFIELDS, json_encode([
-		            'operationName' => 'doRenew',
-		            'query' => $RENEW_QUERY,
-		            'variables' => [
-		                'passport' => $token
-		            ]
-		        ]));
-	*/
+	return string(bodyBytes), nil
 }
 
 func (k *KRNAuth) Validate(inToken string) (interface{}, error) {
