@@ -30,7 +30,7 @@ type KRNAuth struct {
 	RSAKey     string
 }
 
-const TRINITY_URL = "https://trinity.krone.at"
+var TRINITY_URL = "https://trinity.krone.at"
 
 func NewKRNAuth(name string, crypt_key string, hmac_secret string, rest_key string, rsa_key string) KRNAuth {
 	n := KRNAuth{
