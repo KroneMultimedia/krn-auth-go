@@ -21,7 +21,7 @@ import (
 	jwtgo "github.com/dgrijalva/jwt-go"
 	"github.com/mergermarket/go-pkcs7"
 )
-
+// KRNAuth aa
 type KRNAuth struct {
 	Name       string
 	CryptKey   string
